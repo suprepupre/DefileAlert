@@ -446,14 +446,25 @@ core:SetScript("OnEvent", function(self, event, ...)
         local unit, _, _, _, spellId = ...
         if not DEFILE_IDS[spellId] then return end
         lkGUID = UnitGUID(unit)
+        castDetectTime = GetTime()
+
+        if detected and (GetTime() - lastAnnounce) < DEBOUNCE_SEC then
+            return
+        end
+
+        local name = ReadBossTargetName(unit)
 
         if diagMode then
             print("|cff00ffff[DIAG]|r === UNIT_SPELLCAST_START ===")
             print("|cff00ffff[DIAG]|r   unit: " .. tostring(unit))
             print("|cff00ffff[DIAG]|r   spellId: " .. tostring(spellId))
-            print("|cff00ffff[DIAG]|r   lkGUID: " .. tostring(lkGUID))
-            local tName = ReadBossTargetName(unit)
-            print("|cff00ffff[DIAG]|r   Boss target: " .. tostring(tName))
+            print("|cff00ffff[DIAG]|r   Boss target: " .. tostring(name))
+        end
+
+        if name and name ~= "" and not IsGUID(name) then
+            AnnounceDefile(name, "UNIT_SPELLCAST_bosstarget")
+            pending = false
+            pendingGUID = nil
         end
         return
     end
