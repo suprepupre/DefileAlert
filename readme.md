@@ -19,7 +19,9 @@ When Defile is detected:
 
 ![Preview](screens/defilealert.jpg)
 
----
+## Demo (click to open video)
+
+[![DefileAlert Demo](https://img.youtube.com/vi/FGCChzBoVuM/maxresdefault.jpg)](https://www.youtube.com/watch?v=FGCChzBoVuM)
 
 ## Detection Architecture
 
