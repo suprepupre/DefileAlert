@@ -51,7 +51,7 @@ local ICC_ZONE = "Icecrown Citadel"
 local DEBOUNCE_SEC    = 2.0
 local PENDING_TIMEOUT = 0.5
 
-local ALERT_SOUND = "Sound\\interface\\RaidWarning.wav"
+local ALERT_SOUND = "Interface\\AddOns\\DefileAlert\\Sounds\\AirHorn.ogg"
 
 local pending      = false
 local lastAnnounce = 0
@@ -78,7 +78,7 @@ local defaults = {
     downgradeToRaid  = true,
     whisperTarget    = true,
     flashSelf        = true,
-    flashOther       = true,
+    flashOther       = false,
     soundEnabled     = true,
     centerText       = true,
     selfFlashColor   = { r = 1, g = 0, b = 0, a = 0.45 },
@@ -87,7 +87,7 @@ local defaults = {
     selfTextColor    = { r = 1, g = 0.1, b = 0.1 },
     raidMessage      = "{skull} DEFILE >> %s << {skull}",
     whisperMessage   = "{skull} DEFILE ON YOU — MOVE! {skull}",
-    soundFile        = "Sound\\interface\\RaidWarning.wav",
+    soundFile        = "Interface\\AddOns\\DefileAlert\\Sounds\\AirHorn.ogg",
     textScale        = 46,
     flashDuration    = 0.9,
     textDuration     = 3.5,
@@ -178,7 +178,7 @@ local function InitDB()
     end
     db = DefileAlertDB
 
-    if db.soundFile == "Sound\\Spells\\PVPFlagTakenMono.wav" then
+    if db.soundFile == "Sound\\interface\\RaidWarning.wav" then
         db.soundFile = defaults.soundFile
     end
     if not db.soundFile or db.soundFile == "" then
@@ -305,7 +305,7 @@ local function AnnounceDefile(targetName, source)
         FlashScreen(c.r, c.g, c.b, c.a)
     end
 
-    if db.soundEnabled then
+    if db.soundEnabled and isMe then
         local path = db.soundFile
         if not path or path == "" then path = ALERT_SOUND end
         PlaySoundFile(path)

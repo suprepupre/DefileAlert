@@ -614,10 +614,11 @@ local function BuildOptionsFrame()
     Y = Y - 42
 
     local soundPresets = {
-        { label = "Raid Warning",   path = "Sound\\interface\\RaidWarning.wav" },
-        { label = "PVP Flag",       path = "Sound\\Spells\\PVPFlagTaken.wav" },
-        { label = "Horde Bell",     path = "Sound\\Doodad\\BellTollHorde.wav" },
-        { label = "Alliance Bell",  path = "Sound\\Doodad\\BellTollAlliance.wav" },
+        { label = "Air Horn",        path = "Interface\\AddOns\\DefileAlert\\Sounds\\AirHorn.ogg" },
+        { label = "Raid Warning",    path = "Sound\\interface\\RaidWarning.wav" },
+        { label = "PVP Flag",        path = "Sound\\Spells\\PVPFlagTaken.wav" },
+        { label = "Horde Bell",      path = "Sound\\Doodad\\BellTollHorde.wav" },
+        { label = "Alliance Bell",   path = "Sound\\Doodad\\BellTollAlliance.wav" },
     }
 
     local function MakeSoundBtn(px, py, preset)
