@@ -1,0 +1,10 @@
+## Interface: 30300
+## Title: |cffff0000Defile|r|cffffffffAlert|r
+## Notes: Instant Defile target detection for Lich King (ICC). Zero-wait, spell-ID based.
+## Author: Suprematist
+## Version: 1.0
+## SavedVariables: DefileAlertDB
+## DefaultState: enabled
+
+DefileAlert.lua
+DefileAlertOptions.lua
