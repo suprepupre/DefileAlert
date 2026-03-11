@@ -31,19 +31,11 @@ local DEFILE_IDS = {
     [73710] = true,
 }
 
-local DEFILE_AURA_IDS = {
-    [72754] = true,
-    [73708] = true,
-    [73709] = true,
-    [73710] = true,
-}
-
 local LK_NPC_ID = 36597
 
 local EV_CLEU             = "COMBAT_LOG_EVENT_UNFILTERED"
 local EV_SPELL_CAST_START = "SPELL_CAST_START"
 local EV_SPELL_SUMMON     = "SPELL_SUMMON"
-local EV_AURA_APPLIED     = "SPELL_AURA_APPLIED"
 local EV_UNIT_SPELLCAST   = "UNIT_SPELLCAST_START"
 
 local ICC_ZONE = "Icecrown Citadel"
@@ -347,7 +339,7 @@ core:SetScript("OnEvent", function(self, event, ...)
     if event == EV_CLEU then
         local _, etype = ...
 
-        if etype == EV_SPELL_CAST_START then
+                if etype == EV_SPELL_CAST_START then
             local _, _, srcGUID, srcName, _, destGUID, destName, _, spellId = ...
 
             if not DEFILE_IDS[spellId] then return end
@@ -355,80 +347,50 @@ core:SetScript("OnEvent", function(self, event, ...)
             castDetectTime = GetTime()
             lkGUID = srcGUID
 
-            if diagMode then
-                print("|cff00ffff[DIAG]|r === SPELL_CAST_START ===")
-                print("|cff00ffff[DIAG]|r   spellId: " .. tostring(spellId))
-                print("|cff00ffff[DIAG]|r   srcGUID: " .. tostring(srcGUID))
-                print("|cff00ffff[DIAG]|r   srcName: " .. tostring(srcName))
-                print("|cff00ffff[DIAG]|r   destGUID: " .. tostring(destGUID))
-                print("|cff00ffff[DIAG]|r   destName: " .. tostring(destName))
-                print("|cff00ffff[DIAG]|r   IsGUID(destName): " .. tostring(IsGUID(destName)))
-                local lkUnit = FindLKUnit(srcGUID)
-                local bossTarget = lkUnit and ReadBossTargetName(lkUnit) or "nil"
-                print("|cff00ffff[DIAG]|r   LK unit: " .. tostring(lkUnit))
-                print("|cff00ffff[DIAG]|r   Boss target: " .. tostring(bossTarget))
-                if destGUID and destGUID ~= "" then
-                    local resolved = GUIDtoPlayerName(destGUID)
-                    print("|cff00ffff[DIAG]|r   GUIDtoName(destGUID): " .. tostring(resolved))
-                end
-            end
-
             if detected and (GetTime() - lastAnnounce) < DEBOUNCE_SEC then
                 return
             end
 
             if destName and destName ~= "" and not IsGUID(destName) then
+                if diagMode then
+                    print("|cff00ffff[DIAG]|r CLEU destName: " .. destName)
+                end
                 AnnounceDefile(destName, "CLEU_CAST_destName")
                 pending = false
                 return
             end
 
-            if destGUID and destGUID ~= "" then
+            if destGUID and destGUID ~= "" and not IsGUID(destGUID) then
                 local name = GUIDtoPlayerName(destGUID)
                 if name then
+                    if diagMode then
+                        print("|cff00ffff[DIAG]|r CLEU destGUID resolved: " .. name)
+                    end
                     AnnounceDefile(name, "CLEU_CAST_destGUID")
                     pending = false
                     return
                 end
-                pendingGUID = destGUID
-                pendingStart = GetTime()
-                pending = true
-            else
-                pending = false
             end
 
-            return
-        end
-
-        if etype == EV_AURA_APPLIED then
-            local _, _, _, _, _, destGUID, destName, _, spellId = ...
-            if not DEFILE_AURA_IDS[spellId] then return end
-
-            if diagMode then
-                print("|cff00ffff[DIAG]|r === SPELL_AURA_APPLIED ===")
-                print("|cff00ffff[DIAG]|r   spellId: " .. tostring(spellId))
-                print("|cff00ffff[DIAG]|r   destGUID: " .. tostring(destGUID))
-                print("|cff00ffff[DIAG]|r   destName: " .. tostring(destName))
-            end
-
-            if detected and (GetTime() - lastAnnounce) < DEBOUNCE_SEC then
-                return
-            end
-
-            pending = false
-            pendingGUID = nil
-
-            if destName and destName ~= "" and not IsGUID(destName) then
-                AnnounceDefile(destName, "AURA_destName")
-                return
-            end
-
-            if destGUID and destGUID ~= "" then
-                local name = GUIDtoPlayerName(destGUID)
-                if name then
-                    AnnounceDefile(name, "AURA_destGUID")
+            local lkUnit = FindLKUnit(srcGUID)
+            if lkUnit then
+                local name = ReadBossTargetName(lkUnit)
+                if name and name ~= "" and not IsGUID(name) then
+                    if diagMode then
+                        print("|cff00ffff[DIAG]|r CLEU boss target: " .. name)
+                    end
+                    AnnounceDefile(name, "CLEU_CAST_bosstarget")
+                    pending = false
+                    return
                 end
             end
+
+            if diagMode then
+                print("|cff00ffff[DIAG]|r CLEU: no target resolved, pending...")
+            end
+
+            pending = true
+            pendingStart = GetTime()
             return
         end
 
