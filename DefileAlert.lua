@@ -41,6 +41,8 @@ local ICC_ZONE = "Icecrown Citadel"
 
 local DEBOUNCE_SEC    = 2.0
 local PENDING_TIMEOUT = 0.5
+local COUNTDOWN_PRE   = 5.0
+local COUNTDOWN_SOUND = "Interface\\AddOns\\DefileAlert\\Sounds\\DefileCountdown.ogg"
 
 local ALERT_SOUND = "Interface\\AddOns\\DefileAlert\\Sounds\\AirHorn.ogg"
 
@@ -53,6 +55,10 @@ local pendingGUID  = nil
 local pendingStart = 0
 local diagMode     = false
 local castDetectTime = 0
+local nextCountdownTime = 0
+local countdownPlayed   = false
+local dbmRegistered     = false
+
 
 local TARG = {
     boss1  = "boss1target",
@@ -82,6 +88,7 @@ local defaults = {
     textScale        = 46,
     flashDuration    = 0.9,
     textDuration     = 3.5,
+    countdownEnabled = true,    
 }
 
 local db
@@ -158,6 +165,33 @@ local function ReadBossTargetName(lkUnit)
     local t = TARG[lkUnit]
     if t then return UnitName(t) end
     return UnitName(lkUnit .. "target")
+end
+
+local function RegisterDBMCallback()
+    if dbmRegistered then return end
+    if not DBM or not DBM.RegisterCallback then return end
+
+    DBM:RegisterCallback("DBM_TimerStart", function(event, id, msg, timer, icon, timerType, spellId)
+        local sid = tonumber(spellId) or 0
+        if not DEFILE_IDS[sid] then return end
+        if not db or not db.countdownEnabled then return end
+        nextCountdownTime = GetTime() + timer - COUNTDOWN_PRE
+        countdownPlayed = false
+        if diagMode then
+            print("|cff00ffff[DIAG]|r DBM timer: " .. tostring(timer) .. "s, voice at -5s")
+        end
+    end)
+
+    DBM:RegisterCallback("DBM_TimerStop", function(event, id)
+        if id and (tostring(id):find("72762") or tostring(id):find("73708")
+           or tostring(id):find("73709") or tostring(id):find("73710")
+           or tostring(id):find("efile")) then
+            nextCountdownTime = 0
+            countdownPlayed = false
+        end
+    end)
+
+    dbmRegistered = true
 end
 
 local function InitDB()
@@ -409,6 +443,7 @@ core:SetScript("OnEvent", function(self, event, ...)
         if zone == ICC_ZONE then
             if not zoneActive then
                 zoneActive = true
+                RegisterDBMCallback()                
                 self:RegisterEvent(EV_CLEU)
             end
         else
@@ -418,6 +453,8 @@ core:SetScript("OnEvent", function(self, event, ...)
                 detected = false
                 pendingGUID = nil
                 lkGUID = nil
+                nextCountdownTime = 0
+                countdownPlayed = false                
                 self:UnregisterEvent(EV_CLEU)
             end
         end
@@ -433,45 +470,58 @@ core:SetScript("OnEvent", function(self, event, ...)
             zoneActive = true
             self:RegisterEvent(EV_CLEU)
         end
+        RegisterDBMCallback()
         print("|cffff4444[DefileAlert]|r v" .. ADDON_VERSION .. " loaded"
             .. (zoneActive and " — |cff00ff00ACTIVE|r" or "")
+            .. (dbmRegistered and " — |cff00ff00DBM countdown|r" or "")
             .. " — /da config")
     end
 end)
 
 core:SetScript("OnUpdate", function(self, dt)
-    if not pending then return end
-
-    local now = GetTime()
-
-    if (now - pendingStart) >= PENDING_TIMEOUT then
-        if diagMode then
-            print("|cff00ffff[DIAG]|r TIMEOUT: could not resolve target")
-        end
-        pending = false
-        pendingGUID = nil
+    if not pending and not (db and db.countdownEnabled and nextCountdownTime > 0 and not countdownPlayed) then
         return
     end
 
-    if (now - pendingStart) >= 0.05 then
-        if pendingGUID then
-            local name = GUIDtoPlayerName(pendingGUID)
-            if name then
-                pending = false
-                pendingGUID = nil
-                AnnounceDefile(name, "OnUpdate_retry")
-                return
+    local now = GetTime()
+
+    if pending then
+        if (now - pendingStart) >= PENDING_TIMEOUT then
+            if diagMode then
+                print("|cff00ffff[DIAG]|r TIMEOUT: could not resolve target")
+            end
+            pending = false
+            pendingGUID = nil
+        elseif (now - pendingStart) >= 0.05 then
+            if pendingGUID then
+                local name = GUIDtoPlayerName(pendingGUID)
+                if name then
+                    pending = false
+                    pendingGUID = nil
+                    AnnounceDefile(name, "OnUpdate_retry")
+                    return
+                end
+            end
+
+            local lkUnit = FindLKUnit(lkGUID)
+            if lkUnit then
+                local name = ReadBossTargetName(lkUnit)
+                if name and name ~= "" and not IsGUID(name) then
+                    pending = false
+                    pendingGUID = nil
+                    AnnounceDefile(name, "OnUpdate_bosstarget_retry")
+                    return
+                end
             end
         end
+    end
 
-        local lkUnit = FindLKUnit(lkGUID)
-        if lkUnit then
-            local name = ReadBossTargetName(lkUnit)
-            if name and name ~= "" and not IsGUID(name) then
-                pending = false
-                pendingGUID = nil
-                AnnounceDefile(name, "OnUpdate_bosstarget_retry")
-                return
+    if db and db.countdownEnabled and nextCountdownTime > 0 and not countdownPlayed then
+        if now >= nextCountdownTime then
+            countdownPlayed = true
+            PlaySoundFile(COUNTDOWN_SOUND)
+            if diagMode then
+                print("|cff00ffff[DIAG]|r Countdown voice triggered")
             end
         end
     end
