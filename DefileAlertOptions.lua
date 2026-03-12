@@ -602,6 +602,13 @@ local function BuildOptionsFrame()
     MakeSeparator(f, Y)
     Y = Y - 14
 
+    MakeHeader(f, "COUNTDOWN", 16, Y)
+    Y = Y - 22
+
+    allWidgets[#allWidgets + 1] = MakeCheckbox(f, 16, Y,
+        "5 sec countdown before Defile (requires DBM)", "countdownEnabled")
+    Y = Y - 28
+    
     MakeHeader(f, "SOUND", 16, Y)
     Y = Y - 22
 

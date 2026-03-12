@@ -22,7 +22,7 @@ local print                = print
 local type                 = type
 local UIParent             = UIParent
 
-local ADDON_VERSION = "1.0.3-diag"
+local ADDON_VERSION = "1.1.1"
 
 local DEFILE_IDS = {
     [72762] = true,
@@ -36,7 +36,6 @@ local LK_NPC_ID = 36597
 local EV_CLEU             = "COMBAT_LOG_EVENT_UNFILTERED"
 local EV_SPELL_CAST_START = "SPELL_CAST_START"
 local EV_SPELL_SUMMON     = "SPELL_SUMMON"
-local EV_UNIT_SPELLCAST   = "UNIT_SPELLCAST_START"
 
 local ICC_ZONE = "Icecrown Citadel"
 
@@ -93,6 +92,11 @@ local function IsGUID(str)
     if not str then return true end
     if str == "" then return true end
     return strfind(str, "^0x") ~= nil
+end
+
+local function GUIDtoNPC(guid)
+    if not guid then return 0 end
+    return tonumber(strsub(guid, 9, 12), 16) or 0
 end
 
 local function GUIDtoPlayerName(guid)
@@ -189,11 +193,6 @@ local function InitDB()
     DefileAlertAPI.version = ADDON_VERSION
     DefileAlertAPI.zoneActive = function() return zoneActive end
     DefileAlertAPI.lkUnit = function() return lkGUID end
-end
-
-local function GUIDtoNPC(guid)
-    if not guid then return 0 end
-    return tonumber(strsub(guid, 9, 12), 16) or 0
 end
 
 local flashFrame = CreateFrame("Frame", "DefileAlertFlash", UIParent)
@@ -339,7 +338,7 @@ core:SetScript("OnEvent", function(self, event, ...)
     if event == EV_CLEU then
         local _, etype = ...
 
-                if etype == EV_SPELL_CAST_START then
+        if etype == EV_SPELL_CAST_START then
             local _, _, srcGUID, srcName, _, destGUID, destName, _, spellId = ...
 
             if not DEFILE_IDS[spellId] then return end
@@ -360,7 +359,7 @@ core:SetScript("OnEvent", function(self, event, ...)
                 return
             end
 
-            if destGUID and destGUID ~= "" and not IsGUID(destGUID) then
+            if destGUID and destGUID ~= "" then
                 local name = GUIDtoPlayerName(destGUID)
                 if name then
                     if diagMode then
@@ -404,33 +403,6 @@ core:SetScript("OnEvent", function(self, event, ...)
         return
     end
 
-    if event == EV_UNIT_SPELLCAST then
-        local unit, _, _, _, spellId = ...
-        if not DEFILE_IDS[spellId] then return end
-        lkGUID = UnitGUID(unit)
-        castDetectTime = GetTime()
-
-        if detected and (GetTime() - lastAnnounce) < DEBOUNCE_SEC then
-            return
-        end
-
-        local name = ReadBossTargetName(unit)
-
-        if diagMode then
-            print("|cff00ffff[DIAG]|r === UNIT_SPELLCAST_START ===")
-            print("|cff00ffff[DIAG]|r   unit: " .. tostring(unit))
-            print("|cff00ffff[DIAG]|r   spellId: " .. tostring(spellId))
-            print("|cff00ffff[DIAG]|r   Boss target: " .. tostring(name))
-        end
-
-        if name and name ~= "" and not IsGUID(name) then
-            AnnounceDefile(name, "UNIT_SPELLCAST_bosstarget")
-            pending = false
-            pendingGUID = nil
-        end
-        return
-    end
-
     if event == "ZONE_CHANGED_NEW_AREA"
        or event == "PLAYER_ENTERING_WORLD" then
         local zone = GetZoneText()
@@ -438,7 +410,6 @@ core:SetScript("OnEvent", function(self, event, ...)
             if not zoneActive then
                 zoneActive = true
                 self:RegisterEvent(EV_CLEU)
-                self:RegisterEvent(EV_UNIT_SPELLCAST)
             end
         else
             if zoneActive then
@@ -448,7 +419,6 @@ core:SetScript("OnEvent", function(self, event, ...)
                 pendingGUID = nil
                 lkGUID = nil
                 self:UnregisterEvent(EV_CLEU)
-                self:UnregisterEvent(EV_UNIT_SPELLCAST)
             end
         end
         return
@@ -462,32 +432,48 @@ core:SetScript("OnEvent", function(self, event, ...)
         if zone == ICC_ZONE then
             zoneActive = true
             self:RegisterEvent(EV_CLEU)
-            self:RegisterEvent(EV_UNIT_SPELLCAST)
         end
         print("|cffff4444[DefileAlert]|r v" .. ADDON_VERSION .. " loaded"
             .. (zoneActive and " — |cff00ff00ACTIVE|r" or "")
-            .. " — /da config | /da diag")
+            .. " — /da config")
     end
 end)
 
 core:SetScript("OnUpdate", function(self, dt)
-    if not pending or not pendingGUID then return end
-    if (GetTime() - pendingStart) < 0.05 then return end
+    if not pending then return end
 
-    local name = GUIDtoPlayerName(pendingGUID)
-    if name then
-        pending = false
-        pendingGUID = nil
-        AnnounceDefile(name, "OnUpdate_retry")
-        return
-    end
+    local now = GetTime()
 
-    if (GetTime() - pendingStart) >= PENDING_TIMEOUT then
+    if (now - pendingStart) >= PENDING_TIMEOUT then
         if diagMode then
-            print("|cff00ffff[DIAG]|r TIMEOUT: could not resolve " .. tostring(pendingGUID))
+            print("|cff00ffff[DIAG]|r TIMEOUT: could not resolve target")
         end
         pending = false
         pendingGUID = nil
+        return
+    end
+
+    if (now - pendingStart) >= 0.05 then
+        if pendingGUID then
+            local name = GUIDtoPlayerName(pendingGUID)
+            if name then
+                pending = false
+                pendingGUID = nil
+                AnnounceDefile(name, "OnUpdate_retry")
+                return
+            end
+        end
+
+        local lkUnit = FindLKUnit(lkGUID)
+        if lkUnit then
+            local name = ReadBossTargetName(lkUnit)
+            if name and name ~= "" and not IsGUID(name) then
+                pending = false
+                pendingGUID = nil
+                AnnounceDefile(name, "OnUpdate_bosstarget_retry")
+                return
+            end
+        end
     end
 end)
 
@@ -517,8 +503,6 @@ SlashCmdList["DEFILEALERT"] = function(input)
         diagMode = not diagMode
         if diagMode then
             print("|cff00ffff[DefileAlert DIAG]|r Diagnostic mode |cff00ff00ON|r")
-            print("|cff00ffff[DefileAlert DIAG]|r Trigger Defile and check output.")
-            print("|cff00ffff[DefileAlert DIAG]|r Copy the [DIAG] lines and send them to me.")
         else
             print("|cff00ffff[DefileAlert DIAG]|r Diagnostic mode |cffff0000OFF|r")
         end
