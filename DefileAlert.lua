@@ -22,7 +22,7 @@ local print                = print
 local type                 = type
 local UIParent             = UIParent
 
-local ADDON_VERSION = "1.1.1"
+local ADDON_VERSION = "1.2.0"
 
 local DEFILE_IDS = {
     [72762] = true,
@@ -40,25 +40,25 @@ local EV_SPELL_SUMMON     = "SPELL_SUMMON"
 local ICC_ZONE = "Icecrown Citadel"
 
 local DEBOUNCE_SEC    = 2.0
-local PENDING_TIMEOUT = 0.5
+local SCAN_TIMEOUT    = 0.4
 local COUNTDOWN_PRE   = 5.0
+
 local COUNTDOWN_SOUND = "Interface\\AddOns\\DefileAlert\\Sounds\\DefileCountdown.ogg"
+local ALERT_SOUND     = "Interface\\AddOns\\DefileAlert\\Sounds\\AirHorn.ogg"
 
-local ALERT_SOUND = "Interface\\AddOns\\DefileAlert\\Sounds\\AirHorn.ogg"
-
-local pending      = false
-local lastAnnounce = 0
-local lkGUID       = nil
-local zoneActive   = false
-local detected     = false
-local pendingGUID  = nil
-local pendingStart = 0
-local diagMode     = false
-local castDetectTime = 0
+local pending           = false
+local lastAnnounce      = 0
+local lkGUID            = nil
+local zoneActive        = false
+local detected          = false
+local pendingGUID       = nil
+local pendingStart      = 0
+local diagMode          = false
+local castDetectTime    = 0
+local scanStartTarget   = nil
 local nextCountdownTime = 0
 local countdownPlayed   = false
 local dbmRegistered     = false
-
 
 local TARG = {
     boss1  = "boss1target",
@@ -88,7 +88,7 @@ local defaults = {
     textScale        = 46,
     flashDuration    = 0.9,
     textDuration     = 3.5,
-    countdownEnabled = true,    
+    countdownEnabled = true,
 }
 
 local db
@@ -388,8 +388,9 @@ core:SetScript("OnEvent", function(self, event, ...)
                 if diagMode then
                     print("|cff00ffff[DIAG]|r CLEU destName: " .. destName)
                 end
-                AnnounceDefile(destName, "CLEU_CAST_destName")
+                AnnounceDefile(destName, "CLEU_destName")
                 pending = false
+                scanStartTarget = nil
                 return
             end
 
@@ -399,27 +400,19 @@ core:SetScript("OnEvent", function(self, event, ...)
                     if diagMode then
                         print("|cff00ffff[DIAG]|r CLEU destGUID resolved: " .. name)
                     end
-                    AnnounceDefile(name, "CLEU_CAST_destGUID")
+                    AnnounceDefile(name, "CLEU_destGUID")
                     pending = false
+                    scanStartTarget = nil
                     return
                 end
+                pendingGUID = destGUID
             end
 
             local lkUnit = FindLKUnit(srcGUID)
-            if lkUnit then
-                local name = ReadBossTargetName(lkUnit)
-                if name and name ~= "" and not IsGUID(name) then
-                    if diagMode then
-                        print("|cff00ffff[DIAG]|r CLEU boss target: " .. name)
-                    end
-                    AnnounceDefile(name, "CLEU_CAST_bosstarget")
-                    pending = false
-                    return
-                end
-            end
+            scanStartTarget = lkUnit and ReadBossTargetName(lkUnit) or nil
 
             if diagMode then
-                print("|cff00ffff[DIAG]|r CLEU: no target resolved, pending...")
+                print("|cff00ffff[DIAG]|r Boss target at cast: " .. tostring(scanStartTarget) .. " (skipping, scanning for change...)")
             end
 
             pending = true
@@ -432,6 +425,7 @@ core:SetScript("OnEvent", function(self, event, ...)
             if DEFILE_IDS[spellId] then
                 pending = false
                 pendingGUID = nil
+                scanStartTarget = nil
             end
         end
         return
@@ -443,8 +437,8 @@ core:SetScript("OnEvent", function(self, event, ...)
         if zone == ICC_ZONE then
             if not zoneActive then
                 zoneActive = true
-                RegisterDBMCallback()                
                 self:RegisterEvent(EV_CLEU)
+                RegisterDBMCallback()
             end
         else
             if zoneActive then
@@ -453,8 +447,9 @@ core:SetScript("OnEvent", function(self, event, ...)
                 detected = false
                 pendingGUID = nil
                 lkGUID = nil
+                scanStartTarget = nil
                 nextCountdownTime = 0
-                countdownPlayed = false                
+                countdownPlayed = false
                 self:UnregisterEvent(EV_CLEU)
             end
         end
@@ -465,40 +460,46 @@ core:SetScript("OnEvent", function(self, event, ...)
         if ... ~= "DefileAlert" then return end
         InitDB()
         self:UnregisterEvent("ADDON_LOADED")
+        RegisterDBMCallback()
         local zone = GetZoneText()
         if zone == ICC_ZONE then
             zoneActive = true
             self:RegisterEvent(EV_CLEU)
         end
-        RegisterDBMCallback()
         print("|cffff4444[DefileAlert]|r v" .. ADDON_VERSION .. " loaded"
             .. (zoneActive and " — |cff00ff00ACTIVE|r" or "")
-            .. (dbmRegistered and " — |cff00ff00DBM countdown|r" or "")
+            .. (dbmRegistered and " — |cff00ff00DBM|r" or "")
             .. " — /da config")
     end
 end)
 
 core:SetScript("OnUpdate", function(self, dt)
-    if not pending and not (db and db.countdownEnabled and nextCountdownTime > 0 and not countdownPlayed) then
-        return
-    end
-
     local now = GetTime()
 
     if pending then
-        if (now - pendingStart) >= PENDING_TIMEOUT then
+        local elapsed = now - pendingStart
+
+        if elapsed >= SCAN_TIMEOUT then
             if diagMode then
-                print("|cff00ffff[DIAG]|r TIMEOUT: could not resolve target")
+                print("|cff00ffff[DIAG]|r SCAN TIMEOUT after " .. format("%.0fms", elapsed * 1000))
             end
             pending = false
             pendingGUID = nil
-        elseif (now - pendingStart) >= 0.05 then
+            scanStartTarget = nil
+            return
+        end
+
+        if elapsed >= 0.02 then
             if pendingGUID then
                 local name = GUIDtoPlayerName(pendingGUID)
                 if name then
+                    if diagMode then
+                        print("|cff00ffff[DIAG]|r GUID resolved: " .. name .. " at " .. format("%.0fms", elapsed * 1000))
+                    end
                     pending = false
                     pendingGUID = nil
-                    AnnounceDefile(name, "OnUpdate_retry")
+                    scanStartTarget = nil
+                    AnnounceDefile(name, "GUID_retry")
                     return
                 end
             end
@@ -507,10 +508,16 @@ core:SetScript("OnUpdate", function(self, dt)
             if lkUnit then
                 local name = ReadBossTargetName(lkUnit)
                 if name and name ~= "" and not IsGUID(name) then
-                    pending = false
-                    pendingGUID = nil
-                    AnnounceDefile(name, "OnUpdate_bosstarget_retry")
-                    return
+                    if not scanStartTarget or name ~= scanStartTarget then
+                        if diagMode then
+                            print("|cff00ffff[DIAG]|r Target CHANGED: " .. tostring(scanStartTarget) .. " -> " .. name .. " at " .. format("%.0fms", elapsed * 1000))
+                        end
+                        pending = false
+                        pendingGUID = nil
+                        scanStartTarget = nil
+                        AnnounceDefile(name, "BossTargetScan")
+                        return
+                    end
                 end
             end
         end
@@ -553,6 +560,7 @@ SlashCmdList["DEFILEALERT"] = function(input)
         diagMode = not diagMode
         if diagMode then
             print("|cff00ffff[DefileAlert DIAG]|r Diagnostic mode |cff00ff00ON|r")
+            print("|cff00ffff[DefileAlert DIAG]|r DBM: " .. (dbmRegistered and "|cff00ff00connected|r" or "|cffff0000not found|r"))
         else
             print("|cff00ffff[DefileAlert DIAG]|r Diagnostic mode |cffff0000OFF|r")
         end
@@ -560,7 +568,8 @@ SlashCmdList["DEFILEALERT"] = function(input)
         print("|cffff4444[DefileAlert]|r v" .. ADDON_VERSION .. " Status:")
         print("  Zone: " .. (zoneActive and "|cff00ff00ICC|r" or "|cffaaaaaanot ICC|r"))
         print("  LK GUID: " .. (lkGUID or "none"))
-        print("  Diag: " .. (diagMode and "|cff00ff00ON|r" or "OFF"))
+        print("  DBM: " .. (dbmRegistered and "|cff00ff00connected|r" or "not found"))
+        print("  Countdown: " .. (db.countdownEnabled and "ON" or "OFF"))
         print("  Channel: " .. (db.announceEnabled and db.announceChannel or "OFF"))
         print("  Whisper: " .. (db.whisperTarget and "ON" or "OFF"))
     elseif input == "help" then
