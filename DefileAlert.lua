@@ -21,6 +21,8 @@ local strlower             = string.lower
 local print                = print
 local type                 = type
 local UIParent             = UIParent
+local GetRealZoneText      = GetRealZoneText
+local GetSubZoneText       = GetSubZoneText
 
 local ADDON_VERSION = "1.2.0"
 
@@ -37,7 +39,15 @@ local EV_CLEU             = "COMBAT_LOG_EVENT_UNFILTERED"
 local EV_SPELL_CAST_START = "SPELL_CAST_START"
 local EV_SPELL_SUMMON     = "SPELL_SUMMON"
 
-local ICC_ZONE = "Icecrown Citadel"
+local ICC_ZONES = {
+    ["Icecrown Citadel"] = true,
+    ["The Frozen Throne"] = true,
+    ["Frostwing Halls"] = true,
+    ["The Plagueworks"] = true,
+    ["The Crimson Hall"] = true,
+    ["The Upper Spire"] = true,
+    ["The Lower Spire"] = true,
+}
 
 local DEBOUNCE_SEC    = 2.0
 local SCAN_TIMEOUT    = 0.4
@@ -432,9 +442,12 @@ core:SetScript("OnEvent", function(self, event, ...)
     end
 
     if event == "ZONE_CHANGED_NEW_AREA"
+       or event == "ZONE_CHANGED"
        or event == "PLAYER_ENTERING_WORLD" then
-        local zone = GetZoneText()
-        if zone == ICC_ZONE then
+        local inICC = ICC_ZONES[GetZoneText()]
+                   or ICC_ZONES[GetRealZoneText()]
+                   or ICC_ZONES[GetSubZoneText()]
+        if inICC then
             if not zoneActive then
                 zoneActive = true
                 self:RegisterEvent(EV_CLEU)
@@ -461,8 +474,10 @@ core:SetScript("OnEvent", function(self, event, ...)
         InitDB()
         self:UnregisterEvent("ADDON_LOADED")
         RegisterDBMCallback()
-        local zone = GetZoneText()
-        if zone == ICC_ZONE then
+        local inICC = ICC_ZONES[GetZoneText()]
+                   or ICC_ZONES[GetRealZoneText()]
+                   or ICC_ZONES[GetSubZoneText()]
+        if inICC then
             zoneActive = true
             self:RegisterEvent(EV_CLEU)
         end
@@ -536,6 +551,7 @@ end)
 
 core:RegisterEvent("ADDON_LOADED")
 core:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+core:RegisterEvent("ZONE_CHANGED")
 core:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 SLASH_DEFILEALERT1 = "/defilealert"
