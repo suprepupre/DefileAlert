@@ -9,7 +9,6 @@ local IsRaidOfficer        = IsRaidOfficer
 local SendChatMessage      = SendChatMessage
 local PlaySoundFile        = PlaySoundFile
 local CreateFrame          = CreateFrame
-local GetZoneText          = GetZoneText
 local select               = select
 local tonumber             = tonumber
 local pairs                = pairs
@@ -21,8 +20,10 @@ local strlower             = string.lower
 local print                = print
 local type                 = type
 local UIParent             = UIParent
-local GetRealZoneText      = GetRealZoneText
-local GetSubZoneText       = GetSubZoneText
+local SetMapToCurrentZone  = SetMapToCurrentZone
+local GetCurrentMapAreaID  = GetCurrentMapAreaID
+
+local ICC_MAP_ID = 605
 
 local ADDON_VERSION = "1.2.0"
 
@@ -38,16 +39,6 @@ local LK_NPC_ID = 36597
 local EV_CLEU             = "COMBAT_LOG_EVENT_UNFILTERED"
 local EV_SPELL_CAST_START = "SPELL_CAST_START"
 local EV_SPELL_SUMMON     = "SPELL_SUMMON"
-
-local ICC_ZONES = {
-    ["Icecrown Citadel"] = true,
-    ["The Frozen Throne"] = true,
-    ["Frostwing Halls"] = true,
-    ["The Plagueworks"] = true,
-    ["The Crimson Hall"] = true,
-    ["The Upper Spire"] = true,
-    ["The Lower Spire"] = true,
-}
 
 local DEBOUNCE_SEC    = 2.0
 local SCAN_TIMEOUT    = 0.4
@@ -104,6 +95,12 @@ local defaults = {
 local db
 
 DefileAlertAPI = {}
+
+local function IsInICC()
+    SetMapToCurrentZone()
+    local mapID = GetCurrentMapAreaID()
+    return mapID == ICC_MAP_ID
+end
 
 local function IsGUID(str)
     if not str then return true end
@@ -444,10 +441,7 @@ core:SetScript("OnEvent", function(self, event, ...)
     if event == "ZONE_CHANGED_NEW_AREA"
        or event == "ZONE_CHANGED"
        or event == "PLAYER_ENTERING_WORLD" then
-        local inICC = ICC_ZONES[GetZoneText()]
-                   or ICC_ZONES[GetRealZoneText()]
-                   or ICC_ZONES[GetSubZoneText()]
-        if inICC then
+        if IsInICC() then
             if not zoneActive then
                 zoneActive = true
                 self:RegisterEvent(EV_CLEU)
@@ -474,10 +468,7 @@ core:SetScript("OnEvent", function(self, event, ...)
         InitDB()
         self:UnregisterEvent("ADDON_LOADED")
         RegisterDBMCallback()
-        local inICC = ICC_ZONES[GetZoneText()]
-                   or ICC_ZONES[GetRealZoneText()]
-                   or ICC_ZONES[GetSubZoneText()]
-        if inICC then
+        if IsInICC() then
             zoneActive = true
             self:RegisterEvent(EV_CLEU)
         end
@@ -486,6 +477,7 @@ core:SetScript("OnEvent", function(self, event, ...)
             .. (dbmRegistered and " — |cff00ff00DBM|r" or "")
             .. " — /da config")
     end
+
 end)
 
 core:SetScript("OnUpdate", function(self, dt)
