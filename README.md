@@ -194,3 +194,15 @@ MIT
 ## Author
 
 **Suprematist**
+
+---
+
+## Also for WoW 3.3.5a
+
+| Project | What it does |
+|---|---|
+| [wow_optimize](https://github.com/suprepupre/wow-optimize) | Engine-level optimization DLL - allocator, Lua VM, timers, file I/O, frame-time benchmark |
+| [LuaBoost](https://github.com/suprepupre/LuaBoost) | Addon-side GC control, loading-screen helpers, shared APIs for addon authors |
+| [WA_SafeGuard](https://github.com/suprepupre/WA_SafeGuard) | Backs up WeakAuras so a forced disconnect cannot wipe your auras |
+| [DSPlates](https://github.com/suprepupre/DSPlates) | Divine Storm icon on enemy nameplates, with range checking (Paladin) |
+
