@@ -2,8 +2,6 @@
 
 **Instant Defile target detection for The Lich King encounter in Icecrown Citadel.**
 
-World of Warcraft 3.3.5a (build 12340) · Lua 5.1 · Zero dependencies
-
 ---
 
 ## What It Does
@@ -25,7 +23,8 @@ When Defile is detected:
 
 ## Detection Architecture
 
-Triple-path detection ensures zero missed Defiles:
+Three detection paths, so a Defile is still caught when the first one cannot
+resolve the target:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -62,16 +61,6 @@ LK unit resolution priority:
 1. Download or clone this repository
 2. Copy the `DefileAlert` folder to `World of Warcraft/Interface/AddOns/`
 3. Restart WoW or `/reload`
-
-```
-World of Warcraft/
-└── Interface/
-    └── AddOns/
-        └── DefileAlert/
-            ├── DefileAlert.toc
-            ├── DefileAlert.lua
-            └── DefileAlertOptions.lua
-```
 
 ---
 
@@ -188,12 +177,6 @@ Settings are stored in `DefileAlertDB` (WTF folder). Delete this file to reset a
 ## License
 
 MIT
-
----
-
-## Author
-
-**Suprematist**
 
 ---
 
